@@ -1,0 +1,16 @@
+
+==================================== ERRORS ====================================
+______________________ ERROR collecting tests/test_bot.py ______________________
+ImportError while importing test module '/Users/alandebortolo/Backups/impressora/metaculus/bot/tests/test_bot.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+../../../../.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_bot.py:4: in <module>
+    from metac_bot import parse_forecast, aggregate, numeric_cdf, clean_env, already_forecast
+E   ModuleNotFoundError: No module named 'metac_bot'
+=========================== short test summary info ============================
+ERROR tests/test_bot.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.14s

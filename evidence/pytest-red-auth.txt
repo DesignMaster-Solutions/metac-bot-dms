@@ -1,0 +1,30 @@
+.............................F                                           [100%]
+=================================== FAILURES ===================================
+__________________________ test_auth_failure_isolated __________________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10b694e20>
+
+    def test_auth_failure_isolated(monkeypatch):
+        import metac_bot as bot
+        import subprocess
+        def fake(cmd,**kwargs):
+            return subprocess.CompletedProcess(cmd,1,'','subscription unavailable') if cmd[0]=='claude' else subprocess.CompletedProcess(cmd,0,'Logged in using ChatGPT','')
+        monkeypatch.setattr(bot.subprocess,'run',fake)
+>       assert bot.subscription_preflight()=={'claude':'claude: subscription login unavailable'}
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_bot.py:170: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def subscription_preflight():
+        checks=[(['codex','login','status'],'codex'),(['claude','auth','status','--json'],'claude')]
+        for cmd,name in checks:
+            p=subprocess.run(cmd,env=clean_env(),capture_output=True,text=True,timeout=30)
+>           if p.returncode: raise RuntimeError(f'{name}: subscription login unavailable')
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           RuntimeError: claude: subscription login unavailable
+
+metac_bot.py:311: RuntimeError
+=========================== short test summary info ============================
+FAILED tests/test_bot.py::test_auth_failure_isolated - RuntimeError: claude: ...
+1 failed, 29 passed in 0.89s

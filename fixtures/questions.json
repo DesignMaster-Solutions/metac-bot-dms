@@ -1,0 +1,75 @@
+{
+  "fixture_only": true,
+  "next": null,
+  "results": [
+    {
+      "id": -1,
+      "question": {
+        "description": "Synthetic offline engineering fixture, not a real Metaculus tournament question. The random generator is fair and independent; no external facts are needed.",
+        "fine_print": "Use exactly the stated random experiment. No current or upcoming tournament is represented.",
+        "scheduled_close_time": "2099-01-01T00:00:00Z",
+        "scheduled_resolve_time": "2099-01-02T00:00:00Z",
+        "status": "open",
+        "my_forecasts": null,
+        "unit": null,
+        "options": null,
+        "scaling": null,
+        "open_lower_bound": false,
+        "open_upper_bound": false,
+        "id": -101,
+        "type": "binary",
+        "title": "Will a fair coin land heads on one independent toss?",
+        "resolution_criteria": "Resolves Yes if the single fair coin toss is heads; otherwise No."
+      }
+    },
+    {
+      "id": -2,
+      "question": {
+        "description": "Synthetic offline engineering fixture, not a real Metaculus tournament question. The random generator is fair and independent; no external facts are needed.",
+        "fine_print": "Use exactly the stated random experiment. No current or upcoming tournament is represented.",
+        "scheduled_close_time": "2099-01-01T00:00:00Z",
+        "scheduled_resolve_time": "2099-01-02T00:00:00Z",
+        "status": "open",
+        "my_forecasts": null,
+        "unit": "units",
+        "options": null,
+        "scaling": {
+          "range_min": 0,
+          "range_max": 100,
+          "zero_point": null,
+          "inbound_outcome_count": 200
+        },
+        "open_lower_bound": false,
+        "open_upper_bound": false,
+        "id": -102,
+        "type": "numeric",
+        "title": "What value will a uniform random number generator return between 0 and 100?",
+        "resolution_criteria": "Resolves to one draw from the continuous uniform distribution on [0, 100]."
+      }
+    },
+    {
+      "id": -3,
+      "question": {
+        "description": "Synthetic offline engineering fixture, not a real Metaculus tournament question. The random generator is fair and independent; no external facts are needed.",
+        "fine_print": "Use exactly the stated random experiment. No current or upcoming tournament is represented.",
+        "scheduled_close_time": "2099-01-01T00:00:00Z",
+        "scheduled_resolve_time": "2099-01-02T00:00:00Z",
+        "status": "open",
+        "my_forecasts": null,
+        "unit": null,
+        "options": [
+          "Red",
+          "Green",
+          "Blue"
+        ],
+        "scaling": null,
+        "open_lower_bound": false,
+        "open_upper_bound": false,
+        "id": -103,
+        "type": "multiple_choice",
+        "title": "Which color will be drawn from three equally likely colors?",
+        "resolution_criteria": "One independent uniform draw selects Red, Green, or Blue; resolves to that exact label."
+      }
+    }
+  ]
+}

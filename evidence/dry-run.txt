@@ -1,0 +1,43 @@
+ROUND -101/2 claude: valid
+ROUND -102/2 claude: valid
+ROUND -101/3 codex: valid
+ROUND -101/1 codex: valid
+MEDIAN -101: 0.5
+PRIVATE COMMENT -101:
+Automatic subscription-CLI ensemble; no human in the loop. 3/3 valid independent rounds. Aggregation: median (per-option median renormalized for multiple choice; numeric CDF standardized).
+Aggregate: 0.5
+
+Round 1 (codex): The supplied facts specify one fair, independent coin toss, with Yes resolving exactly on heads. Heads and tails each have probability 0.5; the distant resolution date does not change the stated experiment. Source: supplied question description and resolution criteria.
+
+Round 2 (claude): Offline synthetic fixture; only the supplied facts are used and no web research was performed. The question states that the coin is fair and that the single toss is independent. A fair coin gives P(heads) = 0.5. There is no base rate, status quo, or timing effect that would change this, because the resolution depends only on the stated random experiment. The fine print rules out any outside context. Edge cases such as the coin landing on its edge are excluded by the premise that the coin is fair, so the remaining uncertainty is purely aleatory. Sources: the question's description, resolution criteria, and fine print.
+
+Round 3 (codex): The supplied fixture specifies one fair, independent coin toss. Heads and tails are equally likely, so the literal Yes criterion has probability 0.5. No external evidence is needed; the distant resolution date does not change the stated experiment.
+DRY RUN -101: no API calls, nothing published
+ROUND -102/3 codex: valid
+ROUND -103/2 claude: valid
+ROUND -102/1 codex: valid
+MEDIAN -102: {"points": 201, "first": 0.0, "middle": 0.5, "last": 1.0}
+PRIVATE COMMENT -102:
+Automatic subscription-CLI ensemble; no human in the loop. 3/3 valid independent rounds. Aggregation: median (per-option median renormalized for multiple choice; numeric CDF standardized).
+Aggregate: {"points": 201, "first": 0.0, "middle": 0.5, "last": 1.0}
+
+Round 1 (codex): The supplied resolution criteria specify one fair continuous uniform draw on [0, 100], so its p-quantile is 100p. Closed bounds exclude outcomes outside this interval. Independence and the fixed experiment make timing and external evidence irrelevant; uncertainty is entirely the stated randomness. Source: supplied question data.
+
+Round 2 (claude): Offline synthetic fixture: the outcome is a single draw from a continuous Uniform[0,100] distribution, with a fair and independent generator (per the question's description and resolution criteria). The bounds are closed, so there is no tail mass outside [0,100]. The quantiles of Uniform(0,100) are simply q×100. There are no external facts, base rates or status-quo considerations that could move the forecast, since the draw is purely random. The remaining uncertainty is irreducible randomness, not missing evidence. Source: supplied question data only; no web research was performed, as instructed.
+
+Round 3 (codex): The supplied resolution criteria specify a fair continuous uniform draw on [0, 100], so its p-quantile is 100p. Closed bounds exclude outcomes outside this interval. Independence and the stated experiment make external evidence and time until resolution irrelevant; uncertainty is entirely the random draw.
+DRY RUN -102: no API calls, nothing published
+ROUND -103/1 codex: valid
+ROUND -103/3 codex: valid
+MEDIAN -103: {"Red": 0.3333333333333333, "Green": 0.3333333333333333, "Blue": 0.3333333333333333}
+PRIVATE COMMENT -103:
+Automatic subscription-CLI ensemble; no human in the loop. 3/3 valid independent rounds. Aggregation: median (per-option median renormalized for multiple choice; numeric CDF standardized).
+Aggregate: {"Red": 0.3333333333333333, "Green": 0.3333333333333333, "Blue": 0.3333333333333333}
+
+Round 1 (codex): The supplied fixture specifies one fair, independent uniform draw among Red, Green, and Blue. Each exact outcome therefore has probability 1/3; no external evidence or timing adjustment is relevant.
+
+Round 2 (claude): Offline synthetic fixture: the resolution criteria specify one fair, independent, uniform draw among three labels (Red, Green, Blue). No external evidence is relevant or available, and no information favors any option, so the principled forecast is the uniform distribution. Probabilities are rounded to sum to 1. Uncertainty is purely aleatory; the only residual risk is a fixture or generator flaw, but there is no evidence of one, so there is no adjustment. Source: question description and resolution criteria (supplied fixture).
+
+Round 3 (codex): The supplied fixture specifies one fair, independent uniform draw among three colors. Each exact label therefore has probability 1/3; the resolution date does not affect these probabilities. Source: supplied question data.
+DRY RUN -103: no API calls, nothing published
+SUMMARY {"success": 3, "skipped": 0, "failed": 0}

@@ -1,0 +1,17 @@
+.................................F.                                      [100%]
+=================================== FAILURES ===================================
+_________________ test_asknews_off_by_default_and_free_opt_in __________________
+
+tmp_path = PosixPath('/private/var/folders/rf/4vvk0y0s3vv315l_6ns0gx6r0000gn/T/pytest-of-alandebortolo/pytest-4/test_asknews_off_by_default_an0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10af3d450>
+
+    def test_asknews_off_by_default_and_free_opt_in(tmp_path,monkeypatch):
+        import metac_bot as bot
+>       assert bot.asknews_context('test',None)==''
+               ^^^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'metac_bot' has no attribute 'asknews_context'
+
+tests/test_bot.py:197: AttributeError
+=========================== short test summary info ============================
+FAILED tests/test_bot.py::test_asknews_off_by_default_and_free_opt_in - Attri...
+1 failed, 34 passed in 0.34s

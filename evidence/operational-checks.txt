@@ -1,0 +1,3 @@
+NO TOKEN: no API calls, no forecasts, nothing published
+launchd --print: valid plist; StartInterval=1200; no KeepAlive; not installed
+subscription preflight: {}
