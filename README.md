@@ -37,8 +37,8 @@ are sent before forecasts. Every prompt, raw response, aggregate, payload and AP
 receipt is appended to per-question JSONL. Interrupted, failed or ambiguous sends
 are never automatically retried: this favors avoiding duplicate forecasts over
 coverage. Preserve `runtime/live/`; do not delete state to rerun a live question.
-A comment can remain without a forecast if the second write fails. API integration
-has not been verified against an authenticated account yet.
+A comment can remain without a forecast if the second write fails. The API flow was
+verified with an authenticated bot on four bot-testing-area questions (unscored).
 
 ## Activate later
 
@@ -56,8 +56,8 @@ uv run python metac_bot.py
 ./install_launchd.sh          # installs StartInterval=1200, no KeepAlive
 ```
 
-The installer is supplied but **was not run**. No accounts were created and no
-live tournament questions were used during development. AskNews is not required;
+Try it first on unscored questions with
+`--tournament bot-testing-area --post-id <id> --state-dir runtime/testing-area`. AskNews is not required;
 subscription web search is the default. After free AskNews enrollment, optionally
 pass `--asknews-free-token-file /path/to/private-token` (mode 600). The adapter uses
 [AskNews news search](https://docs.asknews.app/en/reference), adds context to each

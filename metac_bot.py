@@ -14,6 +14,8 @@ import signal
 import statistics
 import subprocess
 import sys
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -403,13 +405,19 @@ class APIClient:
                 "User-Agent": "metac-bot-dms/1.0",
             },
         )
-        with urllib.request.urlopen(request, timeout=30) as response:
-            body = response.read()
-            return json.loads(body) if body else None
+        for attempt in range(5):
+            try:
+                with urllib.request.urlopen(request, timeout=30) as response:
+                    body = response.read()
+                    return json.loads(body) if body else None
+            except urllib.error.HTTPError as error:
+                if payload is not None or error.code != 429 or attempt == 4:
+                    raise
+                time.sleep(int(error.headers.get("Retry-After") or 30 * (attempt + 1)))
 
-    def posts(self):
+    def posts(self, tournaments=TOURNAMENTS):
         found = {}
-        for tournament in TOURNAMENTS:
+        for tournament in tournaments:
             offset = 0
             while True:
                 params = urllib.parse.urlencode(
@@ -426,7 +434,8 @@ class APIClient:
                 for post in page["results"]:
                     if post.get("question"):
                         found[post["id"]] = post
-                if not page.get("next"):
+                # The API keeps returning "next" on empty pages.
+                if not page["results"] or not page.get("next"):
                     break
                 offset += 100
         return sorted(
@@ -679,7 +688,9 @@ async def run(args):
             if TOKEN_PATH.stat().st_mode & 0o077:
                 raise ValueError("Token file must have mode 600")
             client = APIClient(TOKEN_PATH.read_text().strip())
-            posts = await asyncio.to_thread(client.posts)
+            posts = await asyncio.to_thread(client.posts, args.tournament or TOURNAMENTS)
+            if args.post_id:
+                posts = [p for p in posts if p["id"] in args.post_id]
         if not posts:
             print("No open questions")
             return 0
@@ -717,6 +728,14 @@ def main():
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--fixture", default=str(ROOT / "fixtures/questions.json"))
     parser.add_argument("--state-dir")
+    parser.add_argument(
+        "--post-id", action="append", type=int, help="Only these posts (for a short test run)"
+    )
+    parser.add_argument(
+        "--tournament",
+        action="append",
+        help="Replace the default tournaments (e.g. bot-testing-area for an unscored first run)",
+    )
     parser.add_argument(
         "--asknews-free-token-file",
         help="Optional token file ONLY after free Metaculus bot enrollment; never used in dry-run",

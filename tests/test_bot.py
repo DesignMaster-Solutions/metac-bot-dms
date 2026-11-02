@@ -373,3 +373,74 @@ def test_numeric_honors_api_point_count():
     question = q("numeric")
     question["scaling"]["inbound_outcome_count"] = 50
     assert len(numeric_cdf({"10": 10, "90": 90}, question)) == 51
+
+
+def test_posts_lists_requested_tournaments(monkeypatch):
+    import metac_bot as bot
+
+    seen = []
+
+    def request(self, path, payload=None):
+        seen.append(path)
+        return {"results": [], "next": None}
+
+    monkeypatch.setattr(bot.APIClient, "request", request)
+    bot.APIClient("t").posts(("bot-testing-area",))
+    assert len(seen) == 1 and "tournaments=bot-testing-area" in seen[0]
+    seen.clear()
+    bot.APIClient("t").posts()
+    assert len(seen) == 2 and "tournaments=minibench" in seen[0]
+
+
+def _http_429():
+    import email.message
+    import urllib.error
+
+    headers = email.message.Message()
+    headers["Retry-After"] = "7"
+    return urllib.error.HTTPError("u", 429, "Too Many Requests", headers, None)
+
+
+class _Resp:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def read(self):
+        return b"{}"
+
+
+def test_get_retries_429_but_post_never(monkeypatch):
+    import metac_bot as bot
+
+    waits, calls = [], []
+
+    def urlopen(request, timeout):
+        calls.append(request.get_method())
+        if len(calls) == 1:
+            raise _http_429()
+        return _Resp()
+
+    monkeypatch.setattr(bot.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(bot.time, "sleep", waits.append)
+    assert bot.APIClient("t").request("/x") == {}
+    assert calls == ["GET", "GET"] and waits == [7]
+
+    calls.clear()
+    with pytest.raises(bot.urllib.error.HTTPError):
+        bot.APIClient("t").request("/x", {"a": 1})
+    assert calls == ["POST"]
+
+
+def test_posts_stops_on_empty_page_even_with_next(monkeypatch):
+    import metac_bot as bot
+
+    pages = [{"results": [{"id": 1, "question": {"id": 1}}], "next": "u"}, {"results": [], "next": "u"}]
+
+    def request(self, path, payload=None):
+        return pages.pop(0)  # IndexError if pagination does not stop
+
+    monkeypatch.setattr(bot.APIClient, "request", request)
+    assert [p["id"] for p in bot.APIClient("t").posts(("x",))] == [1]
