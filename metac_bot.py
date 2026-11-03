@@ -22,7 +22,9 @@ import urllib.request
 ROOT = Path(__file__).resolve().parent
 API = "https://www.metaculus.com/api"
 TOKEN_PATH = Path.home() / ".config/clauditor/metaculus_token"
-TOURNAMENTS = ("minibench", "fall-futureeval-2026")
+# shortcut: the Market Pulse slug changes every quarter (an unknown slug is HTTP 400 and
+# breaks the run); add market-pulse-27q1 once Metaculus publishes it (~Jan 2027).
+TOURNAMENTS = ("minibench", "fall-futureeval-2026", "market-pulse-26q4")
 ROUNDS = ("codex", "claude", "codex")
 SYSTEM = (
     "You are an autonomous forecasting researcher, not a coding agent. "
@@ -424,7 +426,7 @@ class APIClient:
                     {
                         "tournaments": tournament,
                         "statuses": "open",
-                        "forecast_type": "binary,numeric,discrete,multiple_choice",
+                        "forecast_type": "binary,numeric,discrete,multiple_choice,group_of_questions",
                         "include_description": "true",
                         "limit": 100,
                         "offset": offset,
@@ -432,8 +434,10 @@ class APIClient:
                 )
                 page = self.request("/posts/?" + params)
                 for post in page["results"]:
-                    if post.get("question"):
-                        found[post["id"]] = post
+                    for q in questions_of(post):
+                        # A group post stays open while its other subquestions are upcoming or resolved.
+                        if post.get("question") or q.get("status") == "open":
+                            found[q["id"]] = {**post, "question": q}
                 # The API keeps returning "next" on empty pages.
                 if not page["results"] or not page.get("next"):
                     break
@@ -442,6 +446,22 @@ class APIClient:
             found.values(),
             key=lambda p: p["question"].get("scheduled_close_time") or "9999",
         )
+
+
+def questions_of(post):
+    """The post's question, or each subquestion of a group carrying the group's shared texts."""
+    if post.get("question"):
+        return [post["question"]]
+    group = post.get("group_of_questions") or {}
+    shared = {k: group.get(k) for k in ("description", "resolution_criteria", "fine_print")}
+    return [
+        {**q, **{k: q.get(k) or v for k, v in shared.items()}}
+        for q in group.get("questions", [])
+    ]
+
+
+def question_in(post, qid):
+    return next((q for q in questions_of(post) if q["id"] == qid), None)
 
 
 def payload(q, value):
@@ -513,8 +533,8 @@ async def process(
         return "skipped"
     if client:
         post = await asyncio.to_thread(client.request, f"/posts/{post['id']}/")
-        q = post["question"]
-        if already_forecast(q) or not still_open(q):
+        q = question_in(post, qid)
+        if q is None or already_forecast(q) or not still_open(q):
             print(f"SKIP {qid}: already forecast or closed", flush=True)
             return "skipped"
     state = {"question_id": qid, "post_id": post["id"], "status": "started"}
@@ -611,7 +631,8 @@ async def process(
     )
     if client:
         fresh = await asyncio.to_thread(client.request, f"/posts/{post['id']}/")
-        if already_forecast(fresh["question"]) or not still_open(fresh["question"]):
+        current = question_in(fresh, qid)
+        if current is None or already_forecast(current) or not still_open(current):
             state["status"] = "skipped_before_send"
             save_state(path, state)
             return "skipped"

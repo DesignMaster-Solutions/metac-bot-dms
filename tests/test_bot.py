@@ -389,7 +389,79 @@ def test_posts_lists_requested_tournaments(monkeypatch):
     assert len(seen) == 1 and "tournaments=bot-testing-area" in seen[0]
     seen.clear()
     bot.APIClient("t").posts()
-    assert len(seen) == 2 and "tournaments=minibench" in seen[0]
+    assert len(seen) == 3 and "tournaments=minibench" in seen[0]
+    assert "tournaments=market-pulse-26q4" in seen[2]
+
+
+def test_group_subquestions_forecast_with_shared_texts(tmp_path, monkeypatch):
+    """Market Pulse is all groups: each OPEN subquestion is forecast on its own id."""
+    import asyncio
+    import metac_bot as bot
+
+    sub = dict(
+        q("numeric"),
+        id=201,
+        status="open",
+        title="VIX max? (Nov 9 - Nov 20)",
+        description="",
+        resolution_criteria="",
+        fine_print="",
+        scheduled_close_time="2099-01-01T00:00:00Z",
+    )
+    group = {
+        "id": 20,
+        "title": "VIX max?",
+        "group_of_questions": {
+            "description": "VIX description",
+            "resolution_criteria": "Highest HIGH in the CBOE CSV",
+            "fine_print": "Closed days are skipped",
+            "questions": [sub, dict(sub, id=202, status="upcoming")],
+        },
+    }
+    seen = []
+
+    def request(self, path, payload=None):
+        seen.append(path)
+        return {"results": [group], "next": None}
+
+    monkeypatch.setattr(bot.APIClient, "request", request)
+    posts = bot.APIClient("t").posts(("market-pulse-26q4",))
+    assert "group_of_questions" in urllib_unquote(seen[0])
+    assert [(p["id"], p["question"]["id"]) for p in posts] == [(20, 201)]
+
+    prompts = []
+
+    async def fake(provider, prompt, *args):
+        prompts.append(prompt)
+        return response(quantiles={"10": 20, "50": 30, "90": 40})
+
+    monkeypatch.setattr(bot, "run_cli", fake)
+
+    class Client:
+        def __init__(self):
+            self.writes = []
+
+        def request(self, path, body=None):
+            if body is None:
+                return group
+            self.writes.append((path, body))
+            return {"id": 1}
+
+    client = Client()
+    result = asyncio.run(
+        bot.process(posts[0], client, tmp_path, asyncio.Semaphore(3), 10, False)
+    )
+    assert result == "success"
+    assert "Highest HIGH in the CBOE CSV" in prompts[0]
+    (_, comment), (_, forecast) = client.writes
+    assert comment["on_post"] == 20
+    assert forecast[0]["question"] == 201 and len(forecast[0]["continuous_cdf"]) == 201
+
+
+def urllib_unquote(s):
+    import urllib.parse
+
+    return urllib.parse.unquote(s)
 
 
 def _http_429():
