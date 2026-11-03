@@ -516,3 +516,51 @@ def test_posts_stops_on_empty_page_even_with_next(monkeypatch):
 
     monkeypatch.setattr(bot.APIClient, "request", request)
     assert [p["id"] for p in bot.APIClient("t").posts(("x",))] == [1]
+
+
+def test_market_pulse_refreshes_once_on_the_eve_bot_only_never(tmp_path, monkeypatch):
+    """Spot scoring counts only the forecast standing at close: redo it once near close."""
+    import asyncio
+    from datetime import datetime, timedelta, timezone
+    import metac_bot as bot
+
+    async def fake(provider, prompt, *args):
+        return response(quantiles={"10": 20, "50": 30, "90": 40})
+
+    monkeypatch.setattr(bot, "run_cli", fake)
+    close = (datetime.now(timezone.utc) + timedelta(hours=10)).isoformat()
+    sub = dict(
+        q("numeric"),
+        id=301,
+        status="open",
+        scheduled_close_time=close,
+        my_forecasts={"latest": {"forecast_values": [0.5]}, "history": [1]},
+    )
+    group = {"id": 30, "group_of_questions": {"questions": [sub]}}
+
+    class Client:
+        def __init__(self):
+            self.writes = []
+
+        def request(self, path, body=None):
+            if body is None:
+                return group
+            self.writes.append((path, body))
+            return {"id": 1}
+
+    def run(tournament, state_dir):
+        state_dir.mkdir()
+        (state_dir / "301.json").write_text('{"status": "published"}')
+        client = Client()
+        post = {**group, "question": sub, "tournament": tournament}
+        results = [
+            asyncio.run(bot.process(post, client, state_dir, asyncio.Semaphore(3), 10, False))
+            for _ in range(2)
+        ]
+        return results, [w[0] for w in client.writes]
+
+    assert run("market-pulse-26q4", tmp_path / "mp") == (
+        ["success", "skipped"],
+        ["/comments/create/", "/questions/forecast/"],
+    )
+    assert run("minibench", tmp_path / "mb") == (["skipped", "skipped"], [])

@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import bisect
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import fcntl
 import json
 import math
@@ -25,6 +25,9 @@ TOKEN_PATH = Path.home() / ".config/clauditor/metaculus_token"
 # shortcut: the Market Pulse slug changes every quarter (an unknown slug is HTTP 400 and
 # breaks the run); add market-pulse-27q1 once Metaculus publishes it (~Jan 2027).
 TOURNAMENTS = ("minibench", "fall-futureeval-2026", "market-pulse-26q4")
+# Bot-only tournaments take ONE forecast per question; Market Pulse allows updates.
+REFRESHABLE = {"market-pulse-26q4"}
+REFRESH_HOURS = 30
 ROUNDS = ("codex", "claude", "codex")
 SYSTEM = (
     "You are an autonomous forecasting researcher, not a coding agent. "
@@ -437,7 +440,7 @@ class APIClient:
                     for q in questions_of(post):
                         # A group post stays open while its other subquestions are upcoming or resolved.
                         if post.get("question") or q.get("status") == "open":
-                            found[q["id"]] = {**post, "question": q}
+                            found[q["id"]] = {**post, "question": q, "tournament": tournament}
                 # The API keeps returning "next" on empty pages.
                 if not page["results"] or not page.get("next"):
                     break
@@ -462,6 +465,16 @@ def questions_of(post):
 
 def question_in(post, qid):
     return next((q for q in questions_of(post) if q["id"] == qid), None)
+
+
+def due_refresh(post, q, path):
+    """Spot scoring counts only the forecast standing at close: redo it once on the eve."""
+    if post.get("tournament") not in REFRESHABLE or not path.exists():
+        return False
+    if json.loads(path.read_text()).get("status") != "published":
+        return False
+    close = datetime.fromisoformat(q["scheduled_close_time"].replace("Z", "+00:00"))
+    return close - datetime.now(timezone.utc) < timedelta(hours=REFRESH_HOURS)
 
 
 def payload(q, value):
@@ -528,13 +541,16 @@ async def process(
     qid = q["id"]
     path = state_dir / f"{qid}.json"
     log = state_dir / f"{qid}.jsonl"
+    refresh = due_refresh(post, q, path)
+    if refresh:
+        path = state_dir / f"{qid}.refresh.json"
     if path.exists():
         print(f"SKIP {qid}: durable attempt exists", flush=True)
         return "skipped"
     if client:
         post = await asyncio.to_thread(client.request, f"/posts/{post['id']}/")
         q = question_in(post, qid)
-        if q is None or already_forecast(q) or not still_open(q):
+        if q is None or (already_forecast(q) and not refresh) or not still_open(q):
             print(f"SKIP {qid}: already forecast or closed", flush=True)
             return "skipped"
     state = {"question_id": qid, "post_id": post["id"], "status": "started"}
@@ -632,7 +648,7 @@ async def process(
     if client:
         fresh = await asyncio.to_thread(client.request, f"/posts/{post['id']}/")
         current = question_in(fresh, qid)
-        if current is None or already_forecast(current) or not still_open(current):
+        if current is None or (already_forecast(current) and not refresh) or not still_open(current):
             state["status"] = "skipped_before_send"
             save_state(path, state)
             return "skipped"
