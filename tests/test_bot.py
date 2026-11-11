@@ -564,3 +564,17 @@ def test_market_pulse_refreshes_once_on_the_eve_bot_only_never(tmp_path, monkeyp
         ["/comments/create/", "/questions/forecast/"],
     )
     assert run("minibench", tmp_path / "mb") == (["skipped", "skipped"], [])
+
+
+@pytest.mark.parametrize(
+    "wrap",
+    [
+        "I've finished the research; here is the forecast.\n\n%s",
+        "```json\n%s\n```\n\nSources:\n- [SRS](https://example.org/a)",
+        "About 30%% {roughly}.\n\n```json\n%s\n```\n\nSources:\n- x",
+        "%s\n\nSources:\n- [x](https://example.org) {not json}",
+    ],
+)
+def test_json_with_prose_around(wrap):
+    # real claude replies from runtime/live (46525, 46660, 46524, 46279)
+    assert parse_forecast(wrap % response(probability_yes=0.5), q())[0] == 0.5

@@ -10,6 +10,7 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import signal
 import statistics
 import subprocess
@@ -156,11 +157,20 @@ def numeric_cdf(quantiles, q):
 
 
 def parse_forecast(raw, q):
-    raw = raw.strip()
-    if raw.startswith("```") and raw.endswith("```"):
-        raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
     try:
-        obj = json.loads(raw)
+        # Models wrap the object in prose, fences or a trailing source list:
+        # take the first JSON object that carries a rationale.
+        obj = None
+        for m in re.finditer(r"\{", raw):
+            try:
+                cand, _ = json.JSONDecoder().raw_decode(raw[m.start() :])
+            except json.JSONDecodeError:
+                continue
+            if isinstance(cand, dict) and "rationale" in cand:
+                obj = cand
+                break
+        if obj is None:
+            obj = json.loads(raw.strip())
         rationale = obj["rationale"]
         if not isinstance(rationale, str) or not rationale.strip():
             raise ValueError("Missing rationale")
