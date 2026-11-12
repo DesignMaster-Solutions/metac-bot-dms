@@ -609,3 +609,28 @@ def test_all_failed_is_retried_until_cap(tmp_path, monkeypatch):
     assert [run() for _ in range(bot.MAX_FAILED_TRIES + 1)] == [
         "failed"
     ] * bot.MAX_FAILED_TRIES + ["skipped"]
+
+
+def test_claude_falls_back_to_another_logged_in_profile(monkeypatch, tmp_path):
+    """Real case 2026-11-12: the pinned profile was logged out, three siblings were not."""
+    import json
+    import subprocess
+
+    import metac_bot as bot
+
+    for name in ("1-out", "2-apikey", "3-ok", "4-ok"):
+        (tmp_path / name).mkdir()
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "1-out"))
+
+    def fake(cmd, env=None, **kwargs):
+        if cmd[0] == "codex":
+            return subprocess.CompletedProcess(cmd, 0, "Logged in using ChatGPT", "")
+        name = env["CLAUDE_CONFIG_DIR"].rsplit("/", 1)[-1]
+        if name == "1-out":
+            return subprocess.CompletedProcess(cmd, 1, '{"loggedIn":false}', "")
+        method = "claude.ai" if name.endswith("ok") else "api_key"
+        return subprocess.CompletedProcess(cmd, 0, json.dumps({"authMethod": method}), "")
+
+    monkeypatch.setattr(bot.subprocess, "run", fake)
+    assert bot.subscription_preflight() == {}
+    assert bot.clean_env()["CLAUDE_CONFIG_DIR"] == str(tmp_path / "3-ok")

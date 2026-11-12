@@ -699,27 +699,53 @@ async def process(
     return "success"
 
 
+def claude_profiles():
+    """Pinned profile first, then its sibling profiles (same parent folder)."""
+    pinned = os.environ.get("CLAUDE_CONFIG_DIR")
+    if not pinned:
+        return [None]
+    pinned = Path(pinned)
+    siblings = sorted(p for p in pinned.parent.iterdir() if p.is_dir() and p != pinned)
+    return [pinned, *siblings]
+
+
+def check_login(cmd, name, env):
+    p = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=30)
+    if p.returncode:
+        raise RuntimeError(f"{name}: subscription login unavailable")
+    if name == "codex" and "chatgpt" not in (p.stdout + p.stderr).lower():
+        raise RuntimeError("Codex must use ChatGPT subscription login")
+    if name == "claude":
+        data = json.loads(p.stdout)
+        if data.get("authMethod") != "claude.ai":
+            raise RuntimeError("Claude must use claude.ai subscription login")
+
+
 def subscription_preflight():
-    checks = [
-        (["codex", "login", "status"], "codex"),
-        (["claude", "auth", "status", "--json"], "claude"),
-    ]
+    failures = (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired)
     errors = {}
-    for cmd, name in checks:
+    try:
+        check_login(["codex", "login", "status"], "codex", clean_env())
+    except failures as e:
+        errors["codex"] = str(e)
+    # A logged-out pinned profile used to cost the Claude round on every question
+    # (21 rounds, 2026-11-05..11); any sibling with a claude.ai login serves.
+    first = None
+    for profile in claude_profiles():
+        env = clean_env()
+        if profile:
+            env["CLAUDE_CONFIG_DIR"] = str(profile)
         try:
-            p = subprocess.run(
-                cmd, env=clean_env(), capture_output=True, text=True, timeout=30
-            )
-            if p.returncode:
-                raise RuntimeError(f"{name}: subscription login unavailable")
-            if name == "codex" and "chatgpt" not in (p.stdout + p.stderr).lower():
-                raise RuntimeError("Codex must use ChatGPT subscription login")
-            if name == "claude":
-                data = json.loads(p.stdout)
-                if data.get("authMethod") != "claude.ai":
-                    raise RuntimeError("Claude must use claude.ai subscription login")
-        except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as e:
-            errors[name] = str(e)
+            check_login(["claude", "auth", "status", "--json"], "claude", env)
+        except failures as e:
+            first = first or str(e)
+            continue
+        if profile and os.environ.get("CLAUDE_CONFIG_DIR") != str(profile):
+            print(f"CLAUDE profile fallback: {profile.name}", flush=True)
+            os.environ["CLAUDE_CONFIG_DIR"] = str(profile)
+        break
+    else:
+        errors["claude"] = first
     return errors
 
 
