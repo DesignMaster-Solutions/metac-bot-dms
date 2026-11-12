@@ -634,3 +634,16 @@ def test_claude_falls_back_to_another_logged_in_profile(monkeypatch, tmp_path):
     monkeypatch.setattr(bot.subprocess, "run", fake)
     assert bot.subscription_preflight() == {}
     assert bot.clean_env()["CLAUDE_CONFIG_DIR"] == str(tmp_path / "3-ok")
+
+
+def test_tails_follow_forecast_spread_not_range_width():
+    question = q("numeric")
+    question.update(open_lower_bound=True, open_upper_bound=True)
+    cdf = numeric_cdf({"10": 40, "25": 45, "50": 50, "75": 55, "90": 60}, question)
+    assert cdf[80] == pytest.approx(0.1, abs=0.005)
+    assert cdf[120] == pytest.approx(0.9, abs=0.005)
+    # A forecast centred mid-range must not leak 6% of mass past each open bound.
+    assert cdf[0] < 0.02 and cdf[-1] > 0.98
+    # Outcomes just outside the 10-90 band keep real density (was 0.005 per 5 units).
+    assert cdf[80] - cdf[70] > 0.04
+    assert cdf[130] - cdf[120] > 0.04

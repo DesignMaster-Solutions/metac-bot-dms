@@ -136,6 +136,19 @@ def numeric_cdf(quantiles, q):
         + [(v, p) for p, v in pairs]
         + [(pairs[-1][1] + width if q["open_upper_bound"] else hi, 1.0)]
     )
+    # Put 3/4 of each tail where a normal fitted to the two outermost quantiles
+    # (30% wider, models run overconfident) would put it; only the last quarter
+    # stretches a full range width. A flat tail that wide starved outcomes just
+    # outside the 10-90 band and leaked mass past open bounds.
+    z = statistics.NormalDist().inv_cdf
+    for (p1, v1), (p2, v2), edge, at in (
+        (pairs[-1], pairs[-2], 1 - (1 - pairs[-1][0]) / 4, len(anchors) - 1),
+        (pairs[0], pairs[1], pairs[0][0] / 4, 1),
+    ):
+        x = v1 + 1.3 * (v2 - v1) / (z(p2) - z(p1)) * (z(edge) - z(p1))
+        a, b = sorted((anchors[at - 1][0], anchors[at][0]))
+        if a < x < b:
+            anchors.insert(at, (x, edge))
     xs = [v for v, p in anchors]
     cdf = []
     for x in grid:
