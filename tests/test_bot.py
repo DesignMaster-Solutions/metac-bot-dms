@@ -578,3 +578,34 @@ def test_market_pulse_refreshes_once_on_the_eve_bot_only_never(tmp_path, monkeyp
 def test_json_with_prose_around(wrap):
     # real claude replies from runtime/live (46525, 46660, 46524, 46279)
     assert parse_forecast(wrap % response(probability_yes=0.5), q())[0] == 0.5
+
+
+def test_all_failed_is_retried_until_cap(tmp_path, monkeypatch):
+    # 46660 (03/11): codex out of quota + malformed claude JSON = never forecast again
+    import asyncio
+    import metac_bot as bot
+
+    healthy = False
+
+    async def fake(provider, prompt, timeout, offline):
+        if not healthy:
+            raise RuntimeError("usage limit")
+        return response(probability_yes=0.25)
+
+    monkeypatch.setattr(bot, "run_cli", fake)
+    question = q()
+    question["id"] = 77
+    post = {"id": 7, "question": question}
+    run = lambda: asyncio.run(
+        bot.process(post, None, tmp_path, asyncio.Semaphore(3), 10, True)
+    )
+    assert run() == "failed"
+    healthy = True
+    assert run() == "success"
+    assert run() == "skipped"
+
+    healthy = False
+    question["id"] = 78
+    assert [run() for _ in range(bot.MAX_FAILED_TRIES + 1)] == [
+        "failed"
+    ] * bot.MAX_FAILED_TRIES + ["skipped"]

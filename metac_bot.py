@@ -537,6 +537,9 @@ def still_open(q):
     ) > datetime.now(timezone.utc)
 
 
+MAX_FAILED_TRIES = 4
+
+
 async def process(
     post,
     client,
@@ -554,16 +557,26 @@ async def process(
     refresh = due_refresh(post, q, path)
     if refresh:
         path = state_dir / f"{qid}.refresh.json"
+    tries = 1
     if path.exists():
-        print(f"SKIP {qid}: durable attempt exists", flush=True)
-        return "skipped"
+        prior = json.loads(path.read_text())
+        tries = prior.get("tries", 1) + 1
+        # all-fail published nothing, so a retry cannot double-post; the cap spares CLI quota
+        if prior.get("status") != "all_rounds_failed" or tries > MAX_FAILED_TRIES:
+            print(f"SKIP {qid}: durable attempt exists", flush=True)
+            return "skipped"
     if client:
         post = await asyncio.to_thread(client.request, f"/posts/{post['id']}/")
         q = question_in(post, qid)
         if q is None or (already_forecast(q) and not refresh) or not still_open(q):
             print(f"SKIP {qid}: already forecast or closed", flush=True)
             return "skipped"
-    state = {"question_id": qid, "post_id": post["id"], "status": "started"}
+    state = {
+        "question_id": qid,
+        "post_id": post["id"],
+        "status": "started",
+        "tries": tries,
+    }
     save_state(path, state)
     news = ""
     if asknews_token and not offline:
