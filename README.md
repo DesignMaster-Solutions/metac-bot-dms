@@ -29,7 +29,9 @@ Aggregation uses the median: binary probabilities clipped to 0.03–0.97,
 per-option medians normalized with nonzero mass, and pointwise median numeric CDFs.
 Numeric CDFs interpolate nominal quantiles on the API's linear/log grid, with 201
 points (discrete: inbound outcome count + 1), open/closed endpoints and bin caps.
-Malformed rounds are dropped; if all fail, nothing is published.
+A Codex round that fails (usage limit, bad output) is redone once on Claude and
+labelled "claude, after codex failed" in the private comment. Other malformed
+rounds are dropped; if all fail, nothing is published.
 
 A durable attempt marker is written **before inference**, and an exclusive lock
 prevents overlapping jobs. Existing remote forecasts are skipped. Private comments

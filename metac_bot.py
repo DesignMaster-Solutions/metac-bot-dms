@@ -603,7 +603,7 @@ async def process(
                 flush=True,
             )
 
-    async def one(i, provider):
+    async def one(i, provider, note=""):
         prompt = make_prompt(q, i, offline)
         if news:
             prompt += (
@@ -632,7 +632,7 @@ async def process(
                 record(log, "response", round=i + 1, provider=provider, raw=raw)
                 value, reason = parse_forecast(raw, q)
                 print(f"ROUND {qid}/{i + 1} {provider}: valid", flush=True)
-                return value, f"Round {i + 1} ({provider}): {reason}"
+                return value, f"Round {i + 1} ({provider}{note}): {reason}"
             except Exception as e:
                 record(
                     log, "round_failed", round=i + 1, provider=provider, error=str(e)
@@ -643,7 +643,15 @@ async def process(
                 )
                 return None
 
-    results = await asyncio.gather(*(one(i, p) for i, p in enumerate(ROUNDS)))
+    async def with_fallback(i, provider):
+        # Codex out (usage limit, 12-13 Nov 2026) left forecasts on 1/3 rounds: redo it on Claude.
+        # Called outside one() so the retry never holds two semaphore slots.
+        result = await one(i, provider)
+        if result is None and provider == "codex":
+            result = await one(i, "claude", ", after codex failed")
+        return result
+
+    results = await asyncio.gather(*(with_fallback(i, p) for i, p in enumerate(ROUNDS)))
     valid = [r for r in results if r is not None]
     if not valid:
         state["status"] = "all_rounds_failed"

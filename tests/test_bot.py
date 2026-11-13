@@ -647,3 +647,31 @@ def test_tails_follow_forecast_spread_not_range_width():
     # Outcomes just outside the 10-90 band keep real density (was 0.005 per 5 units).
     assert cdf[80] - cdf[70] > 0.04
     assert cdf[130] - cdf[120] > 0.04
+
+
+def test_codex_round_falls_back_to_claude_and_says_so(tmp_path, monkeypatch):
+    # 12-13 Nov 2026: Codex hit its usage limit and forecasts went out on 1/3 rounds.
+    import asyncio
+    import metac_bot as bot
+
+    calls = []
+
+    async def fake(provider, prompt, timeout, offline):
+        calls.append(provider)
+        if provider == "codex":
+            raise RuntimeError("You've hit your usage limit")
+        return response(probability_yes=0.25)
+
+    monkeypatch.setattr(bot, "run_cli", fake)
+    question = q()
+    question["id"] = 101
+    post = {"id": 11, "question": question}
+    assert (
+        asyncio.run(bot.process(post, None, tmp_path, asyncio.Semaphore(3), 10, True))
+        == "success"
+    )
+    assert sorted(calls) == ["claude"] * 3 + ["codex"] * 2
+    text = json.loads((tmp_path / "101.json").read_text())["comment"]["text"]
+    assert "3/3" in text
+    assert "Round 1 (claude, after codex failed)" in text
+    assert "Round 2 (claude):" in text
